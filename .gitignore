@@ -1,0 +1,23 @@
+.vscode/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+
+# PowerShell / module tooling
+output/
+TestResults/
+coverage/
+PSGetModuleInfo.xml
+
+# Common dependency folders
+node_modules/
+packages/
+bin/
+obj/
