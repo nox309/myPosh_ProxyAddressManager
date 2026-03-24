@@ -6,57 +6,92 @@ Import-Module -Name $modulePath -Force
 
 Describe 'Write-PamLog' {
     BeforeEach {
-        $script:testRoot = Join-Path -Path $env:TEMP -ChildPath "pam-logging-$([guid]::NewGuid())"
-        New-Item -ItemType Directory -Path $script:testRoot | Out-Null
+        if (Test-Path Function:\Write-Log) {
+            Remove-Item Function:\Write-Log -Force
+        }
 
-        Initialize-PamLogging -AppRoot $script:testRoot
-        Set-PamLoggingConfiguration -AppRoot $script:testRoot -LoggingConfiguration ([pscustomobject]@{
-                path = 'logs\test.log'
+        $script:capturedLogs = @()
+        function global:Write-Log {
+            param(
+                [string]$Message,
+                [string]$StatusLevel,
+                [bool]$Console
+            )
+
+            $script:capturedLogs += [pscustomobject]@{
+                Message = $Message
+                StatusLevel = $StatusLevel
+                Console = $Console
+            }
+        }
+
+        Reset-PamExternalWriteLogCache
+        Initialize-PamLogging -AppRoot $env:TEMP
+        Set-PamLoggingConfiguration -AppRoot $env:TEMP -LoggingConfiguration ([pscustomobject]@{
                 fileMinimumLevel = 'Information'
                 consoleMinimumLevel = 'Error'
-                mirrorToWriteLog = $false
             })
     }
 
     AfterEach {
-        if (Test-Path -Path $script:testRoot) {
-            Remove-Item -Path $script:testRoot -Recurse -Force
+        if (Test-Path Function:\Write-Log) {
+            Remove-Item Function:\Write-Log -Force
         }
+
+        Reset-PamExternalWriteLogCache
     }
 
-    It 'writes messages at or above the file log level' {
+    It 'routes only eligible messages to Write-Log and limits console output' {
         Write-PamLog -Level 'Information' -Message 'Info message'
         Write-PamLog -Level 'Debug' -Message 'Debug message'
+        Write-PamLog -Level 'Error' -Message 'Error message'
 
-        $logPath = Join-Path -Path $script:testRoot -ChildPath 'logs\test.log'
-        $content = Get-Content -Path $logPath -Raw
-
-        $content | Should Match 'Info message'
-        $content | Should Not Match 'Debug message'
+        @($script:capturedLogs).Count | Should Be 2
+        $script:capturedLogs[0].Message | Should Be 'Info message'
+        $script:capturedLogs[0].Console | Should Be $false
+        $script:capturedLogs[1].Message | Should Be 'Error message'
+        $script:capturedLogs[1].Console | Should Be $true
     }
 }
 
 Describe 'Stop-PamExecution' {
     BeforeEach {
-        $script:testRoot = Join-Path -Path $env:TEMP -ChildPath "pam-stop-$([guid]::NewGuid())"
-        New-Item -ItemType Directory -Path $script:testRoot | Out-Null
+        if (Test-Path Function:\Write-Log) {
+            Remove-Item Function:\Write-Log -Force
+        }
 
-        Initialize-PamLogging -AppRoot $script:testRoot
-        Set-PamLoggingConfiguration -AppRoot $script:testRoot -LoggingConfiguration ([pscustomobject]@{
-                path = 'logs\test.log'
+        $script:capturedLogs = @()
+        function global:Write-Log {
+            param(
+                [string]$Message,
+                [string]$StatusLevel,
+                [bool]$Console
+            )
+
+            $script:capturedLogs += [pscustomobject]@{
+                Message = $Message
+                StatusLevel = $StatusLevel
+                Console = $Console
+            }
+        }
+
+        Reset-PamExternalWriteLogCache
+        Initialize-PamLogging -AppRoot $env:TEMP
+        Set-PamLoggingConfiguration -AppRoot $env:TEMP -LoggingConfiguration ([pscustomobject]@{
                 fileMinimumLevel = 'Debug'
                 consoleMinimumLevel = 'Error'
-                mirrorToWriteLog = $false
             })
     }
 
     AfterEach {
-        if (Test-Path -Path $script:testRoot) {
-            Remove-Item -Path $script:testRoot -Recurse -Force
+        if (Test-Path Function:\Write-Log) {
+            Remove-Item Function:\Write-Log -Force
         }
+
+        Reset-PamExternalWriteLogCache
     }
 
-    It 'writes an error log before throwing' {
+    It 'writes via Write-Log before throwing' {
         $didThrow = $false
 
         try {
@@ -68,10 +103,8 @@ Describe 'Stop-PamExecution' {
 
         $didThrow | Should Be $true
 
-        $logPath = Join-Path -Path $script:testRoot -ChildPath 'logs\test.log'
-        $content = Get-Content -Path $logPath -Raw
-
-        $content | Should Match 'Stop message'
-        $content | Should Match '\[Error\]'
+        @($script:capturedLogs).Count | Should Be 1
+        $script:capturedLogs[0].Message | Should Be 'Stop message'
+        $script:capturedLogs[0].Console | Should Be $true
     }
 }
