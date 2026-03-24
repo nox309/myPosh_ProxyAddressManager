@@ -416,8 +416,12 @@ function New-PamMainWindow {
 
     Set-PamGuiShellState -Shell $shell -State $state
 
+    $getShellStateCommand = ${function:Get-PamGuiShellState}
+    $setShellStateCommand = ${function:Set-PamGuiShellState}
+
     $refreshHandler = {
-        Refresh-PamGuiShellData -Shell $shell -Configuration $configuration | Out-Null
+        $updatedState = & $getShellStateCommand -AppRoot $configuration.appRoot -ConfigPath $configuration.configPath -Configuration $configuration
+        & $setShellStateCommand -Shell $shell -State $updatedState | Out-Null
     }.GetNewClosure()
 
     $namedElements.LoadUsersButton.IsEnabled = $true

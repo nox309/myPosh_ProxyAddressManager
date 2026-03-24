@@ -34,4 +34,25 @@ Describe 'Test-PamGuiShell' {
         $result.DataSource | Should Be 'SampleUsers'
         $result.StatusHeadline | Should Be 'Read-only Preview bereit'
     }
+
+    It 'refreshes data when the action buttons are clicked' {
+        if (-not $IsWindows) {
+            return
+        }
+
+        $shell = New-PamMainWindow -AppRoot $repoRoot -ConfigPath $configPath
+
+        try {
+            $clickEventArgs = [System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)
+            $shell.Elements.LoadUsersButton.RaiseEvent($clickEventArgs)
+            $shell.Elements.RefreshPreviewButton.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent))
+
+            $shell.State.DataSource | Should Be 'SampleUsers'
+            @($shell.State.Users).Count | Should Be 1
+            @($shell.State.Preview).Count | Should Be 1
+        }
+        finally {
+            $shell.Window.Close()
+        }
+    }
 }
