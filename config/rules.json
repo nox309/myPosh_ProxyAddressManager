@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "rules": [
+    {
+      "name": "Standard Users",
+      "enabled": true,
+      "priority": 100,
+      "scope": {
+        "organizationalUnits": [
+          "OU=Users,DC=contoso,DC=com"
+        ],
+        "groups": [
+          "CN=MailPolicy-Standard,OU=Groups,DC=contoso,DC=com"
+        ],
+        "attributeFilters": [
+          {
+            "attribute": "department",
+            "operator": "eq",
+            "value": "Sales"
+          }
+        ]
+      },
+      "primaryAddressTemplate": "%GivenName%.%Surname%",
+      "aliasTemplates": [
+        "%SamAccountName%"
+      ],
+      "domainRules": {
+        "primaryDomain": "contoso.com",
+        "aliasDomains": [
+          "contoso.com"
+        ]
+      },
+      "normalizationRules": {
+        "toLower": true,
+        "replaceUmlauts": true,
+        "removeInvalidChars": true,
+        "collapseDots": true,
+        "trimEdgeDots": true
+      },
+      "overrides": []
+    }
+  ]
+}

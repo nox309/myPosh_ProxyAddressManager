@@ -1,0 +1,15 @@
+[
+  {
+    "DistinguishedName": "CN=Max Mustermann,OU=Users,DC=contoso,DC=com",
+    "GivenName": "Max",
+    "Surname": "Mustermann",
+    "SamAccountName": "mmustermann",
+    "Department": "Sales",
+    "Mail": "max.mustermann@contoso.com",
+    "ProxyAddresses": [
+      "SMTP:max.mustermann@contoso.com",
+      "smtp:mmustermann@contoso.com",
+      "X500:/o=Contoso/ou=Exchange Administrative Group/cn=Recipients/cn=Max.Mustermann"
+    ]
+  }
+]
