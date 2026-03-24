@@ -1,20 +1,22 @@
 # Logging
 
-Die Anwendung verwendet jetzt eine duenne Integrationsschicht in `src/Bootstrap/ProxyAddressManager.Logging.psm1`, die auf das externe Modul `myPosh_write-log` bzw. dessen `Write-Log`-Funktion aufsetzt.
+Die Anwendung verwendet jetzt eine gemeinsame Logging-Schicht in `src/Bootstrap/ProxyAddressManager.Logging.psm1`.
 
 ## Ziele
 
-- Log-Level fuer `Write-Log` und Konsole getrennt steuern
+- Log-Level fuer Datei und Konsole getrennt steuern
 - vor jedem `throw` zuerst einen `Error`-Log schreiben
 - Konsolenausgabe auf Key-Informationen begrenzen
-- `Write-Log` direkt nutzen statt eine eigene Logging-Implementierung zu bauen
+- vorhandenes `Write-Log`-Modul weiter nutzen, wenn es verfuegbar ist
 
 ## Aktuelles Verhalten
 
-- Die App uebergibt Logs an `Write-Log`, sobald das Modul verfuegbar ist.
-- Die eigentliche Dateiablage bleibt damit beim externen Modul und wird nicht von der App selbst nachgebaut.
+- Die App schreibt immer in eine lokale Logdatei.
+- Standardpfad:
+  - `output/logs/ProxyAddressManager.log`
+- Wenn das externe Modul `myPosh_write-log` bereits verfuegbar ist, werden Eintraege optional dorthin gespiegelt.
 - Die Konsole zeigt nur Meldungen ab `consoleMinimumLevel`.
-- `fileMinimumLevel` steuert, ab welchem Level die App `Write-Log` ueberhaupt aufruft.
+- Die Datei bekommt Meldungen ab `fileMinimumLevel`.
 
 ## Konfiguration
 
@@ -22,8 +24,10 @@ Die Anwendung verwendet jetzt eine duenne Integrationsschicht in `src/Bootstrap/
 
 ```json
 "logging": {
+  "path": "output/logs/ProxyAddressManager.log",
   "fileMinimumLevel": "Debug",
-  "consoleMinimumLevel": "Information"
+  "consoleMinimumLevel": "Information",
+  "mirrorToWriteLog": true
 }
 ```
 
