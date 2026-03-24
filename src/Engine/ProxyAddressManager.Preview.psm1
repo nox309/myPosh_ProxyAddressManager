@@ -2,8 +2,10 @@ Set-StrictMode -Version Latest
 
 $templateResolverModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'ProxyAddressManager.TemplateResolver.psm1'
 $normalizationModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'ProxyAddressManager.Normalization.psm1'
+$diffModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'ProxyAddressManager.Diff.psm1'
 Import-Module -Name $templateResolverModulePath -Force
 Import-Module -Name $normalizationModulePath -Force
+Import-Module -Name $diffModulePath -Force
 
 function Get-PamPreviewPropertyValue {
     [CmdletBinding()]
@@ -219,38 +221,7 @@ function New-PamRecipientPreview {
         "SMTP:$proposedMail"
     ) + @($deduplicatedAliases | ForEach-Object { "smtp:$_" })
 
-    $changes = New-Object System.Collections.Generic.List[string]
-    if ($currentMail -cne $proposedMail) {
-        $changes.Add('Mail')
-    }
-
-    $currentSmtpAddresses = @($proxyAddressBuckets.Smtp)
-    if (@(Get-PamPreviewUniqueValues -Values $currentSmtpAddresses).Count -ne @($proposedProxyAddresses).Count) {
-        $changes.Add('ProxyAddresses')
-    }
-    else {
-        $sameProxySet = $true
-        foreach ($currentAddress in @(Get-PamPreviewUniqueValues -Values $currentSmtpAddresses)) {
-            $found = $false
-            foreach ($proposedAddress in $proposedProxyAddresses) {
-                if ($currentAddress -ieq $proposedAddress) {
-                    $found = $true
-                    break
-                }
-            }
-
-            if (-not $found) {
-                $sameProxySet = $false
-                break
-            }
-        }
-
-        if (-not $sameProxySet) {
-            $changes.Add('ProxyAddresses')
-        }
-    }
-
-    return [pscustomobject]@{
+    $preview = [pscustomobject]@{
         Identity = Get-PamPreviewIdentity -UserObject $UserObject
         AppliedRule = [string]$Rule.name
         CurrentMail = $currentMail
@@ -258,9 +229,14 @@ function New-PamRecipientPreview {
         CurrentProxyAddresses = @($currentProxyAddresses)
         ProposedProxyAddresses = @($proposedProxyAddresses)
         PreservedNonSmtpProxyAddresses = @($proxyAddressBuckets.NonSmtp)
-        Changes = $changes.ToArray()
         Warnings = $warnings.ToArray()
     }
+
+    $diff = New-PamRecipientDiff -PreviewObject $preview
+    $preview | Add-Member -MemberType NoteProperty -Name Changes -Value @($diff.ChangedProperties) -Force
+    $preview | Add-Member -MemberType NoteProperty -Name Diff -Value $diff -Force
+
+    return $preview
 }
 
 Export-ModuleMember -Function @(

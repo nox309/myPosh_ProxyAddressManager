@@ -51,6 +51,9 @@ Describe 'New-PamRecipientPreview' {
         $result.ProposedProxyAddresses[0] | Should Be 'SMTP:max.mustermann@contoso.com'
         ($result.ProposedProxyAddresses -contains 'smtp:mmustermann@contoso.com') | Should Be $true
         ($result.ProposedProxyAddresses -contains 'smtp:m.mustermann@corp.contoso.com') | Should Be $true
+        $result.Diff.Mail.IsChanged | Should Be $false
+        $result.Diff.ProxyAddresses.IsChanged | Should Be $true
+        ($result.Changes -contains 'ProxyAddresses') | Should Be $true
     }
 
     It 'deduplicates aliases and drops aliases equal to the primary address' {

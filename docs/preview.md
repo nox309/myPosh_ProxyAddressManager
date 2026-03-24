@@ -30,6 +30,7 @@ Das zwoelfte Inkrement fuehrt die erste fachliche Preview-Berechnung fuer primae
 - `ProposedProxyAddresses`
 - `PreservedNonSmtpProxyAddresses`
 - `Changes`
+- `Diff`
 - `Warnings`
 
 ## Ziel fuer die naechsten Inkremente
