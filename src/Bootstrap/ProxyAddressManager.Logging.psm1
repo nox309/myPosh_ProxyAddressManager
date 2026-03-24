@@ -3,10 +3,8 @@ Set-StrictMode -Version Latest
 $script:PamLoggingState = @{
     Initialized = $false
     AppRoot = $null
-    LogPath = $null
     FileMinimumLevel = 'Debug'
     ConsoleMinimumLevel = 'Information'
-    MirrorToWriteLog = $true
     ExternalLoggerChecked = $false
     ExternalLoggerAvailable = $false
     WriteLogCommand = $null
@@ -52,10 +50,8 @@ function Initialize-PamLogging {
     )
 
     $resolvedAppRoot = [System.IO.Path]::GetFullPath($AppRoot)
-    $defaultLogPath = Join-Path -Path $resolvedAppRoot -ChildPath 'output\logs\ProxyAddressManager.log'
 
     $script:PamLoggingState.AppRoot = $resolvedAppRoot
-    $script:PamLoggingState.LogPath = $defaultLogPath
     $script:PamLoggingState.Initialized = $true
 }
 
@@ -82,19 +78,6 @@ function Set-PamLoggingConfiguration {
 
     if (-not [string]::IsNullOrWhiteSpace([string]$LoggingConfiguration.consoleMinimumLevel)) {
         $script:PamLoggingState.ConsoleMinimumLevel = Normalize-PamLogLevel -Level ([string]$LoggingConfiguration.consoleMinimumLevel)
-    }
-
-    if ($null -ne $LoggingConfiguration.mirrorToWriteLog) {
-        $script:PamLoggingState.MirrorToWriteLog = [bool]$LoggingConfiguration.mirrorToWriteLog
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace([string]$LoggingConfiguration.path)) {
-        if ([System.IO.Path]::IsPathRooted([string]$LoggingConfiguration.path)) {
-            $script:PamLoggingState.LogPath = [string]$LoggingConfiguration.path
-        }
-        else {
-            $script:PamLoggingState.LogPath = [System.IO.Path]::GetFullPath((Join-Path -Path $AppRoot -ChildPath ([string]$LoggingConfiguration.path)))
-        }
     }
 }
 
@@ -185,16 +168,15 @@ function Invoke-PamExternalWriteLog {
         [string]$Level,
 
         [Parameter(Mandatory)]
-        [string]$Message
-    )
+        [string]$Message,
 
-    if (-not $script:PamLoggingState.MirrorToWriteLog) {
-        return
-    }
+        [Parameter(Mandatory)]
+        [bool]$Console
+    )
 
     $command = Get-PamExternalWriteLogCommand
     if ($null -eq $command) {
-        return
+        return $false
     }
 
     try {
@@ -211,36 +193,15 @@ function Invoke-PamExternalWriteLog {
 
         $consoleParameterName = @('Console', 'console') | Where-Object { $command.Parameters.ContainsKey($_) } | Select-Object -First 1
         if (-not [string]::IsNullOrWhiteSpace($consoleParameterName)) {
-            $splat[$consoleParameterName] = $false
+            $splat[$consoleParameterName] = $Console
         }
 
         & $command @splat | Out-Null
+        return $true
     }
     catch {
-        # Logging must never break the app flow.
+        return $false
     }
-}
-
-function Write-PamLocalLogFile {
-    param(
-        [Parameter(Mandatory)]
-        [string]$Level,
-
-        [Parameter(Mandatory)]
-        [string]$Message
-    )
-
-    if (-not $script:PamLoggingState.Initialized) {
-        return
-    }
-
-    $logDirectory = Split-Path -Path $script:PamLoggingState.LogPath -Parent
-    if (-not (Test-Path -Path $logDirectory -PathType Container)) {
-        New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-    }
-
-    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
-    Add-Content -Path $script:PamLoggingState.LogPath -Value "[$timestamp][$Level] $Message"
 }
 
 function Write-PamConsoleLog {
@@ -276,13 +237,17 @@ function Write-PamLog {
 
     $normalizedLevel = Normalize-PamLogLevel -Level $Level
     $resolvedConsoleMessage = if ([string]::IsNullOrWhiteSpace($ConsoleMessage)) { $Message } else { $ConsoleMessage }
+    $shouldWriteToWriteLog = Test-PamLogShouldWriteToFile -Level $normalizedLevel
+    $shouldWriteToConsole = Test-PamLogShouldWriteToConsole -Level $normalizedLevel
 
-    if (Test-PamLogShouldWriteToFile -Level $normalizedLevel) {
-        Write-PamLocalLogFile -Level $normalizedLevel -Message $Message
-        Invoke-PamExternalWriteLog -Level $normalizedLevel -Message $Message
+    if ($shouldWriteToWriteLog) {
+        $writeLogSucceeded = Invoke-PamExternalWriteLog -Level $normalizedLevel -Message $Message -Console $shouldWriteToConsole
+        if ($writeLogSucceeded) {
+            return
+        }
     }
 
-    if (Test-PamLogShouldWriteToConsole -Level $normalizedLevel) {
+    if ($shouldWriteToConsole) {
         Write-PamConsoleLog -Level $normalizedLevel -Message $resolvedConsoleMessage
     }
 }
