@@ -1,5 +1,8 @@
 Set-StrictMode -Version Latest
 
+$loggingModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Bootstrap\ProxyAddressManager.Logging.psm1'
+Import-Module -Name $loggingModulePath -Force
+
 function New-PamTemplateNode {
     param(
         [Parameter(Mandatory)]
@@ -45,13 +48,13 @@ function Read-PamTemplateIdentifier {
     )
 
     if ($Position.Value -ge $Expression.Length) {
-        throw 'Es wurde ein Bezeichner erwartet, aber das Ausdrucksende wurde erreicht.'
+        Stop-PamExecution -Message 'Es wurde ein Bezeichner erwartet, aber das Ausdrucksende wurde erreicht.'
     }
 
     $start = $Position.Value
     $firstCharacter = $Expression[$Position.Value]
     if (-not ([char]::IsLetter($firstCharacter) -or $firstCharacter -eq '_')) {
-        throw "Ungueltiger Beginn eines Bezeichners an Position $($Position.Value + 1): '$firstCharacter'"
+        Stop-PamExecution -Message "Ungueltiger Beginn eines Bezeichners an Position $($Position.Value + 1): '$firstCharacter'"
     }
 
     $Position.Value++
@@ -122,7 +125,7 @@ function Read-PamTemplateStringLiteral {
         $Position.Value++
     }
 
-    throw 'Eine Zeichenkette wurde begonnen, aber nicht geschlossen.'
+    Stop-PamExecution -Message 'Eine Zeichenkette wurde begonnen, aber nicht geschlossen.'
 }
 
 function Get-PamSupportedTemplateFunctionMetadata {
@@ -145,7 +148,7 @@ function Parse-PamTemplateAstNode {
     Skip-PamTemplateWhitespace -Expression $Expression -Position $Position
 
     if ($Position.Value -ge $Expression.Length) {
-        throw 'Unerwartetes Ausdrucksende.'
+        Stop-PamExecution -Message 'Unerwartetes Ausdrucksende.'
     }
 
     $currentCharacter = $Expression[$Position.Value]
@@ -165,7 +168,7 @@ function Parse-PamTemplateAstNode {
         $functionMetadata = Get-PamSupportedTemplateFunctionMetadata
         $functionKey = $identifier.ToLowerInvariant()
         if (-not $functionMetadata.ContainsKey($functionKey)) {
-            throw "Die Template-Funktion '$identifier' wird nicht unterstuetzt."
+            Stop-PamExecution -Message "Die Template-Funktion '$identifier' wird nicht unterstuetzt."
         }
 
         $Position.Value++
@@ -181,7 +184,7 @@ function Parse-PamTemplateAstNode {
                 Skip-PamTemplateWhitespace -Expression $Expression -Position $Position
 
                 if ($Position.Value -ge $Expression.Length) {
-                    throw "Die Funktion '$identifier' wurde nicht korrekt geschlossen."
+                    Stop-PamExecution -Message "Die Funktion '$identifier' wurde nicht korrekt geschlossen."
                 }
 
                 if ($Expression[$Position.Value] -eq ',') {
@@ -194,13 +197,13 @@ function Parse-PamTemplateAstNode {
                     break
                 }
 
-                throw "Unerwartetes Zeichen in der Argumentliste von '$identifier' an Position $($Position.Value + 1)."
+                Stop-PamExecution -Message "Unerwartetes Zeichen in der Argumentliste von '$identifier' an Position $($Position.Value + 1)."
             }
         }
 
         $expectedArgumentCount = [int]$functionMetadata[$functionKey]
         if ($arguments.Count -ne $expectedArgumentCount) {
-            throw "Die Template-Funktion '$identifier' erwartet $expectedArgumentCount Argument(e), erhalten wurden $($arguments.Count)."
+            Stop-PamExecution -Message "Die Template-Funktion '$identifier' erwartet $expectedArgumentCount Argument(e), erhalten wurden $($arguments.Count)."
         }
 
         return (New-PamTemplateNode -Kind 'Function' -Properties @{
@@ -222,15 +225,16 @@ function ConvertTo-PamTemplateExpressionAst {
     )
 
     if ([string]::IsNullOrWhiteSpace($Expression)) {
-        throw 'Ein Template-Ausdruck darf nicht leer sein.'
+        Stop-PamExecution -Message 'Ein Template-Ausdruck darf nicht leer sein.'
     }
 
+    Write-PamLog -Level 'Debug' -Message "Template-Ausdruck wird geparst: $Expression"
     $position = 0
     $node = Parse-PamTemplateAstNode -Expression $Expression -Position ([ref]$position)
     Skip-PamTemplateWhitespace -Expression $Expression -Position ([ref]$position)
 
     if ($position -ne $Expression.Length) {
-        throw "Der Template-Ausdruck enthaelt unerwarteten Resttext ab Position $($position + 1)."
+        Stop-PamExecution -Message "Der Template-Ausdruck enthaelt unerwarteten Resttext ab Position $($position + 1)."
     }
 
     return $node
@@ -244,9 +248,10 @@ function Get-PamTemplateTokens {
     )
 
     if ([string]::IsNullOrWhiteSpace($Template)) {
-        throw 'Ein Template darf nicht leer sein.'
+        Stop-PamExecution -Message 'Ein Template darf nicht leer sein.'
     }
 
+    Write-PamLog -Level 'Debug' -Message "Template wird tokenisiert: $Template"
     $tokens = New-Object System.Collections.Generic.List[object]
     $literalBuilder = [System.Text.StringBuilder]::new()
     $position = 0
@@ -269,12 +274,12 @@ function Get-PamTemplateTokens {
 
             $closingPosition = $Template.IndexOf('%', $position + 1)
             if ($closingPosition -lt 0) {
-                throw "Das Template enthaelt einen nicht geschlossenen Platzhalter ab Position $($position + 1)."
+                Stop-PamExecution -Message "Das Template enthaelt einen nicht geschlossenen Platzhalter ab Position $($position + 1)."
             }
 
             $expressionText = $Template.Substring($position + 1, $closingPosition - $position - 1)
             if ([string]::IsNullOrWhiteSpace($expressionText)) {
-                throw "Das Template enthaelt einen leeren Platzhalter an Position $($position + 1)."
+                Stop-PamExecution -Message "Das Template enthaelt einen leeren Platzhalter an Position $($position + 1)."
             }
 
             $tokens.Add([pscustomobject]@{
@@ -302,6 +307,7 @@ function Get-PamTemplateTokens {
             })
     }
 
+    Write-PamLog -Level 'Debug' -Message "Template erfolgreich tokenisiert: $Template"
     return $tokens.ToArray()
 }
 
