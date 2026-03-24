@@ -100,13 +100,11 @@
                                 Content="Benutzer laden"
                                 Width="130"
                                 Height="34"
-                                Margin="0,0,10,0"
-                                IsEnabled="False" />
+                                Margin="0,0,10,0" />
                         <Button Name="RefreshPreviewButton"
                                 Content="Preview aktualisieren"
                                 Width="150"
-                                Height="34"
-                                IsEnabled="False" />
+                                Height="34" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -201,7 +199,7 @@
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="#FF1A2A38" />
-                            <TextBlock Text="Die Liste wird spaeter aus AD oder Testdaten geladen."
+                            <TextBlock Text="Aktuell werden konfigurierte Beispieldaten und Regelzuordnung angezeigt."
                                        Margin="0,4,0,14"
                                        Foreground="#FF607284" />
                         </StackPanel>
@@ -241,7 +239,7 @@
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="#FF1A2A38" />
-                            <TextBlock Text="Ist/Soll-Differenz und Regelzuordnung folgen in den naechsten Inkrementen."
+                            <TextBlock Text="Read-only Vorschau mit Regelname, Mail-Zielwerten und Aenderungszusammenfassung."
                                        Margin="0,4,0,14"
                                        Foreground="#FF607284" />
                         </StackPanel>
@@ -261,6 +259,12 @@
                                 <DataGridTextColumn Header="Regel"
                                                     Binding="{Binding AppliedRule}"
                                                     Width="*" />
+                                <DataGridTextColumn Header="Aktuell"
+                                                    Binding="{Binding CurrentMail}"
+                                                    Width="2*" />
+                                <DataGridTextColumn Header="Vorgeschlagen"
+                                                    Binding="{Binding ProposedMail}"
+                                                    Width="2*" />
                                 <DataGridTextColumn Header="Aenderung"
                                                     Binding="{Binding ChangeSummary}"
                                                     Width="2*" />

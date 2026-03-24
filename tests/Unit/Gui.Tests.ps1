@@ -6,7 +6,7 @@ $configPath = Join-Path -Path $repoRoot -ChildPath 'config\appsettings.json'
 Import-Module -Name $modulePath -Force
 
 Describe 'Get-PamGuiShellState' {
-    It 'builds the placeholder shell state from configuration' {
+    It 'builds the bound shell state from configuration and sample data' {
         $configuration = Get-PamGuiConfiguration -AppRoot $repoRoot -ConfigPath $configPath
         $state = Get-PamGuiShellState -AppRoot $repoRoot -ConfigPath $configPath -Configuration $configuration
 
@@ -14,6 +14,9 @@ Describe 'Get-PamGuiShellState' {
         @($state.StartupModules).Count | Should Be 2
         @($state.Users).Count | Should Be 1
         @($state.Preview).Count | Should Be 1
+        $state.Users[0].Status | Should Match 'Regel:'
+        $state.Preview[0].AppliedRule | Should Be 'Standard Users'
+        $state.Preview[0].ProposedMail | Should Be 'max.mustermann@contoso.com'
     }
 }
 
@@ -28,5 +31,7 @@ Describe 'Test-PamGuiShell' {
         $result.WindowTitle | Should Be 'Proxy Address Manager'
         $result.UserRows | Should Be 1
         $result.PreviewRows | Should Be 1
+        $result.DataSource | Should Be 'SampleUsers'
+        $result.StatusHeadline | Should Be 'Read-only Preview bereit'
     }
 }
