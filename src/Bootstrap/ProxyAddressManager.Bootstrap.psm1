@@ -1,8 +1,6 @@
 Set-StrictMode -Version Latest
 
-$loggingModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'ProxyAddressManager.Logging.psm1'
 $configurationModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Configuration\ProxyAddressManager.Configuration.psm1'
-Import-Module -Name $loggingModulePath -Force
 Import-Module -Name $configurationModulePath -Force
 
 function Get-PamBootstrapCallbacks {
@@ -52,15 +50,15 @@ function Assert-PamRuntimePrerequisites {
     param()
 
     if (-not $IsWindows) {
-        Stop-PamExecution -Message 'ProxyAddressManager unterstuetzt derzeit nur Windows, da die Anwendung PowerShell 7 mit WPF voraussetzt.'
+        throw 'ProxyAddressManager unterstuetzt derzeit nur Windows, da die Anwendung PowerShell 7 mit WPF voraussetzt.'
     }
 
     if ($PSVersionTable.PSEdition -ne 'Core') {
-        Stop-PamExecution -Message "ProxyAddressManager benoetigt PowerShell 7 (PSEdition 'Core'). Aktuell erkannt: '$($PSVersionTable.PSEdition)'."
+        throw "ProxyAddressManager benoetigt PowerShell 7 (PSEdition 'Core'). Aktuell erkannt: '$($PSVersionTable.PSEdition)'."
     }
 
     if ($PSVersionTable.PSVersion -lt [version]'7.0.0') {
-        Stop-PamExecution -Message "ProxyAddressManager benoetigt mindestens PowerShell 7.0. Aktuell erkannt: $($PSVersionTable.PSVersion)."
+        throw "ProxyAddressManager benoetigt mindestens PowerShell 7.0. Aktuell erkannt: $($PSVersionTable.PSVersion)."
     }
 }
 
@@ -115,7 +113,7 @@ function Get-PamInstalledModuleCandidate {
     $resolvedCallbacks = Get-PamBootstrapCallbacks -Callbacks $Callbacks
     $moduleNames = @($ModuleRequirement.moduleNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($moduleNames.Count -eq 0) {
-        Stop-PamExecution -Message "Die Moduldefinition '$($ModuleRequirement.id)' enthaelt keine moduleNames."
+        throw "Die Moduldefinition '$($ModuleRequirement.id)' enthaelt keine moduleNames."
     }
 
     $availableModules = @(& $resolvedCallbacks.GetInstalledModules $moduleNames | Sort-Object Version -Descending)
@@ -149,7 +147,7 @@ function Install-PamModuleRequirement {
             $findPsResourceCommand = & $resolvedCallbacks.GetCommand 'Find-PSResource'
             $installPsResourceCommand = & $resolvedCallbacks.GetCommand 'Install-PSResource'
             if ($null -eq $findPsResourceCommand -or $null -eq $installPsResourceCommand) {
-                Stop-PamExecution -Message "Fuer die Installation von '$displayName' werden 'Find-PSResource' und 'Install-PSResource' aus 'Microsoft.PowerShell.PSResourceGet' benoetigt."
+                throw "Fuer die Installation von '$displayName' werden 'Find-PSResource' und 'Install-PSResource' aus 'Microsoft.PowerShell.PSResourceGet' benoetigt."
             }
 
             if ($ApprovalCallback) {
@@ -160,24 +158,23 @@ function Install-PamModuleRequirement {
             }
 
             if (-not $approval) {
-                Stop-PamExecution -Message "Die Installation des erforderlichen Moduls '$displayName' wurde abgelehnt." -ConsoleMessage "Installation abgelehnt: $displayName"
+                throw "Die Installation des erforderlichen Moduls '$displayName' wurde abgelehnt."
             }
 
             $resource = & $resolvedCallbacks.FindPackage $packageName $repository
             if ($null -eq $resource) {
-                Stop-PamExecution -Message "Das Modulpaket '$packageName' wurde im Repository '$repository' nicht gefunden."
+                throw "Das Modulpaket '$packageName' wurde im Repository '$repository' nicht gefunden."
             }
 
-            Write-PamLog -Level 'Information' -Message "Installiere Modul '$displayName' aus '$repository' im Scope '$scope'." -ConsoleMessage "Installiere Modul: $displayName"
             & $resolvedCallbacks.InstallPackage $packageName $repository $scope
             return
         }
         'Manual' {
             $instructions = if ($ModuleRequirement.instructions) { $ModuleRequirement.instructions } else { 'Bitte stelle das Modul manuell bereit.' }
-            Stop-PamExecution -Message "Das erforderliche Modul '$displayName' ist nicht installiert. $instructions" -ConsoleMessage "Modul fehlt: $displayName"
+            throw "Das erforderliche Modul '$displayName' ist nicht installiert. $instructions"
         }
         default {
-            Stop-PamExecution -Message "Die Installationsstrategie '$($ModuleRequirement.installStrategy)' fuer '$displayName' wird nicht unterstuetzt."
+            throw "Die Installationsstrategie '$($ModuleRequirement.installStrategy)' fuer '$displayName' wird nicht unterstuetzt."
         }
     }
 }
@@ -205,7 +202,7 @@ function Import-PamModuleRequirement {
 
         $command = & $resolvedCallbacks.GetCommand $commandName
         if ($null -eq $command) {
-            Stop-PamExecution -Message "Das Modul '$($ModuleRequirement.displayName)' wurde importiert, aber der erforderliche Befehl '$commandName' ist nicht verfuegbar."
+            throw "Das Modul '$($ModuleRequirement.displayName)' wurde importiert, aber der erforderliche Befehl '$commandName' ist nicht verfuegbar."
         }
     }
 
@@ -224,7 +221,7 @@ function Assert-PamModuleRequirement {
     )
 
     $displayName = if ($ModuleRequirement.displayName) { $ModuleRequirement.displayName } else { $ModuleRequirement.id }
-    Write-PamLog -Level 'Information' -Message "Pruefe erforderliches Modul: $displayName" -ConsoleMessage "Modulpruefung: $displayName"
+    Write-Host "Pruefe erforderliches Modul: $displayName" -ForegroundColor Cyan
 
     $moduleCandidate = Get-PamInstalledModuleCandidate -ModuleRequirement $ModuleRequirement -Callbacks $Callbacks
     if ($null -eq $moduleCandidate) {
@@ -233,19 +230,10 @@ function Assert-PamModuleRequirement {
     }
 
     if ($null -eq $moduleCandidate) {
-        Stop-PamExecution -Message "Das erforderliche Modul '$displayName' konnte nicht gefunden oder installiert werden."
+        throw "Das erforderliche Modul '$displayName' konnte nicht gefunden oder installiert werden."
     }
 
-    $importedModule = Import-PamModuleRequirement -ModuleRequirement $ModuleRequirement -ModuleCandidate $moduleCandidate -Callbacks $Callbacks
-    if ($ModuleRequirement.id -eq 'logging') {
-        Reset-PamExternalWriteLogCache
-        Write-PamLog -Level 'Information' -Message "Das Logging-Modul '$displayName' wurde erfolgreich importiert." -ConsoleMessage 'Logging aktiv'
-    }
-    else {
-        Write-PamLog -Level 'Information' -Message "Das Modul '$displayName' wurde erfolgreich importiert." -ConsoleMessage "Modul geladen: $displayName"
-    }
-
-    return $importedModule
+    return (Import-PamModuleRequirement -ModuleRequirement $ModuleRequirement -ModuleCandidate $moduleCandidate -Callbacks $Callbacks)
 }
 
 function Start-ProxyAddressManagerBootstrap {
@@ -263,11 +251,9 @@ function Start-ProxyAddressManagerBootstrap {
     )
 
     if (-not (Test-Path -Path $AppRoot -PathType Container)) {
-        Stop-PamExecution -Message "Der AppRoot ist ungueltig: $AppRoot"
+        throw "Der AppRoot ist ungueltig: $AppRoot"
     }
 
-    Initialize-PamLogging -AppRoot $AppRoot
-    Write-PamLog -Level 'Information' -Message "Bootstrap wird gestartet fuer AppRoot '$AppRoot'." -ConsoleMessage 'Bootstrap-Start'
     Assert-PamRuntimePrerequisites
 
     $config = Get-PamBootstrapConfiguration -AppRoot $AppRoot -ConfigPath $ConfigPath
@@ -277,8 +263,6 @@ function Start-ProxyAddressManagerBootstrap {
     foreach ($moduleRequirement in $orderedRequirements) {
         Assert-PamModuleRequirement -ModuleRequirement $moduleRequirement -ApprovalCallback $ApprovalCallback -Callbacks $Callbacks | Out-Null
     }
-
-    Write-PamLog -Level 'Information' -Message 'Bootstrap wurde erfolgreich abgeschlossen.' -ConsoleMessage 'Bootstrap abgeschlossen'
 
     return [pscustomobject]@{
         AppRoot = $AppRoot

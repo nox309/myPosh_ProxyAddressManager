@@ -1,8 +1,5 @@
 Set-StrictMode -Version Latest
 
-$loggingModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Bootstrap\ProxyAddressManager.Logging.psm1'
-Import-Module -Name $loggingModulePath -Force
-
 function Assert-PamRuleDefinition {
     [CmdletBinding()]
     param(
@@ -17,39 +14,39 @@ function Assert-PamRuleDefinition {
     )
 
     if ([string]::IsNullOrWhiteSpace($Rule.name)) {
-        Stop-PamExecution -Message "Regel #$Index in '$RulesPath' enthaelt keinen gueltigen Namen."
+        throw "Regel #$Index in '$RulesPath' enthaelt keinen gueltigen Namen."
     }
 
     if ($null -eq $Rule.enabled) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein enabled-Feld."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein enabled-Feld."
     }
 
     if ($null -eq $Rule.priority) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein priority-Feld."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein priority-Feld."
     }
 
     if ($null -eq $Rule.scope) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt keinen scope-Abschnitt."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt keinen scope-Abschnitt."
     }
 
     if ([string]::IsNullOrWhiteSpace($Rule.primaryAddressTemplate)) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein primaryAddressTemplate."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein primaryAddressTemplate."
     }
 
     if ($null -eq $Rule.aliasTemplates) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein aliasTemplates-Feld."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein aliasTemplates-Feld."
     }
 
     if ($null -eq $Rule.domainRules -or [string]::IsNullOrWhiteSpace($Rule.domainRules.primaryDomain)) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt keine gueltigen domainRules.primaryDomain."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt keine gueltigen domainRules.primaryDomain."
     }
 
     if ($null -eq $Rule.normalizationRules) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt keinen normalizationRules-Abschnitt."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt keinen normalizationRules-Abschnitt."
     }
 
     if ($null -eq $Rule.overrides) {
-        Stop-PamExecution -Message "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein overrides-Feld."
+        throw "Regel '$($Rule.name)' in '$RulesPath' enthaelt kein overrides-Feld."
     }
 }
 
@@ -64,11 +61,11 @@ function Assert-PamRulesConfiguration {
     )
 
     if ([string]::IsNullOrWhiteSpace($RulesConfiguration.schemaVersion)) {
-        Stop-PamExecution -Message "Die Regeldatei enthaelt kein schemaVersion-Feld: $RulesPath"
+        throw "Die Regeldatei enthaelt kein schemaVersion-Feld: $RulesPath"
     }
 
     if ($null -eq $RulesConfiguration.rules) {
-        Stop-PamExecution -Message "Die Regeldatei enthaelt kein rules-Feld: $RulesPath"
+        throw "Die Regeldatei enthaelt kein rules-Feld: $RulesPath"
     }
 
     $rules = @($RulesConfiguration.rules)
@@ -80,7 +77,7 @@ function Assert-PamRulesConfiguration {
 
         $priorityKey = [string]$rule.priority
         if ($seenPriorities.ContainsKey($priorityKey)) {
-            Stop-PamExecution -Message "Die Regeldatei '$RulesPath' enthaelt die doppelte Prioritaet '$priorityKey' fuer '$($seenPriorities[$priorityKey])' und '$($rule.name)'."
+            throw "Die Regeldatei '$RulesPath' enthaelt die doppelte Prioritaet '$priorityKey' fuer '$($seenPriorities[$priorityKey])' und '$($rule.name)'."
         }
 
         $seenPriorities[$priorityKey] = $rule.name
@@ -94,16 +91,14 @@ function Get-PamRulesConfiguration {
         [string]$RulesPath
     )
 
-    Write-PamLog -Level 'Debug' -Message "Regeldatei wird geladen: $RulesPath"
     if (-not (Test-Path -Path $RulesPath -PathType Leaf)) {
-        Stop-PamExecution -Message "Die Regeldatei wurde nicht gefunden: $RulesPath"
+        throw "Die Regeldatei wurde nicht gefunden: $RulesPath"
     }
 
     $rulesConfiguration = Get-Content -Path $RulesPath -Raw | ConvertFrom-Json -Depth 20
     Assert-PamRulesConfiguration -RulesConfiguration $rulesConfiguration -RulesPath $RulesPath
 
     $rulesConfiguration | Add-Member -MemberType NoteProperty -Name rulesPath -Value ([System.IO.Path]::GetFullPath($RulesPath)) -Force
-    Write-PamLog -Level 'Debug' -Message "Regeldatei erfolgreich geladen: $RulesPath"
     return $rulesConfiguration
 }
 

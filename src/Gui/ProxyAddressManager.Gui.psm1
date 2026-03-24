@@ -1,8 +1,6 @@
 Set-StrictMode -Version Latest
 
-$loggingModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Bootstrap\ProxyAddressManager.Logging.psm1'
 $configurationModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Configuration\ProxyAddressManager.Configuration.psm1'
-Import-Module -Name $loggingModulePath -Force
 Import-Module -Name $configurationModulePath -Force
 
 function Assert-PamGuiPrerequisites {
@@ -10,7 +8,7 @@ function Assert-PamGuiPrerequisites {
     param()
 
     if (-not $IsWindows) {
-        Stop-PamExecution -Message 'Die WPF-Oberflaeche wird nur unter Windows unterstuetzt.'
+        throw 'Die WPF-Oberflaeche wird nur unter Windows unterstuetzt.'
     }
 
     Add-Type -AssemblyName PresentationFramework
@@ -28,7 +26,6 @@ function Get-PamGuiConfiguration {
         [string]$ConfigPath
     )
 
-    Write-PamLog -Level 'Debug' -Message 'Die GUI-Konfiguration wird ueber den App-Config-Loader aufgeloest.'
     return (Get-PamAppConfiguration -AppRoot $AppRoot -ConfigPath $ConfigPath)
 }
 
@@ -94,7 +91,6 @@ function New-PamMainWindow {
         [string]$ConfigPath
     )
 
-    Write-PamLog -Level 'Debug' -Message "MainWindow wird vorbereitet. AppRoot: $AppRoot"
     Assert-PamGuiPrerequisites
 
     $configuration = Get-PamGuiConfiguration -AppRoot $AppRoot -ConfigPath $ConfigPath
@@ -102,7 +98,7 @@ function New-PamMainWindow {
     $xamlPath = Get-PamGuiXamlPath -AppRoot $AppRoot
 
     if (-not (Test-Path -Path $xamlPath -PathType Leaf)) {
-        Stop-PamExecution -Message "Die XAML-Datei fuer das Hauptfenster wurde nicht gefunden: $xamlPath"
+        throw "Die XAML-Datei fuer das Hauptfenster wurde nicht gefunden: $xamlPath"
     }
 
     $xamlContent = Get-Content -Path $xamlPath -Raw
@@ -137,7 +133,7 @@ function New-PamMainWindow {
 
     foreach ($entry in $namedElements.GetEnumerator()) {
         if ($null -eq $entry.Value) {
-            Stop-PamExecution -Message "Das GUI-Element '$($entry.Key)' konnte im MainWindow nicht gefunden werden."
+            throw "Das GUI-Element '$($entry.Key)' konnte im MainWindow nicht gefunden werden."
         }
     }
 
@@ -185,7 +181,6 @@ function Show-PamMainWindow {
         [string]$ConfigPath
     )
 
-    Write-PamLog -Level 'Information' -Message 'Die WPF-GUI wird als Dialogfenster angezeigt.' -ConsoleMessage 'GUI wird angezeigt'
     $shell = New-PamMainWindow -AppRoot $AppRoot -ConfigPath $ConfigPath
     $null = $shell.Window.ShowDialog()
     return $shell
@@ -201,7 +196,6 @@ function Test-PamGuiShell {
         [string]$ConfigPath
     )
 
-    Write-PamLog -Level 'Debug' -Message 'GUI-Smoke-Test: MainWindow wird geladen und direkt wieder geschlossen.'
     $shell = New-PamMainWindow -AppRoot $AppRoot -ConfigPath $ConfigPath
     $shell.Window.Close()
 

@@ -1,8 +1,6 @@
 Set-StrictMode -Version Latest
 
-$loggingModulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\Bootstrap\ProxyAddressManager.Logging.psm1'
 $tokenizerModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'ProxyAddressManager.TemplateTokenizer.psm1'
-Import-Module -Name $loggingModulePath -Force
 Import-Module -Name $tokenizerModulePath -Force
 
 function ConvertTo-PamTemplateScalarValue {
@@ -59,11 +57,11 @@ function ConvertTo-PamTemplateIntegerValue {
 
     $parsedValue = 0
     if (-not [int]::TryParse($Value, [ref]$parsedValue)) {
-        Stop-PamExecution -Message "Die Funktion '$FunctionName' erwartet fuer das erste Argument einen Integer-Wert."
+        throw "Die Funktion '$FunctionName' erwartet fuer das erste Argument einen Integer-Wert."
     }
 
     if ($parsedValue -lt 0) {
-        Stop-PamExecution -Message "Die Funktion '$FunctionName' erwartet einen nicht-negativen Integer-Wert."
+        throw "Die Funktion '$FunctionName' erwartet einen nicht-negativen Integer-Wert."
     }
 
     return $parsedValue
@@ -79,7 +77,6 @@ function Resolve-PamTemplateExpressionAst {
         [psobject]$UserObject
     )
 
-    Write-PamLog -Level 'Debug' -Message "AST-Knoten wird aufgeloest: $($Ast.Kind)"
     switch ($Ast.Kind) {
         'Attribute' {
             return (ConvertTo-PamTemplateScalarValue (Get-PamTemplateUserPropertyValue -UserObject $UserObject -PropertyName $Ast.Name))
@@ -127,12 +124,12 @@ function Resolve-PamTemplateExpressionAst {
                     return $source.Replace($removeValue, '')
                 }
                 default {
-                    Stop-PamExecution -Message "Die Funktion '$($Ast.Name)' wird im Resolver nicht unterstuetzt."
+                    throw "Die Funktion '$($Ast.Name)' wird im Resolver nicht unterstuetzt."
                 }
             }
         }
         default {
-            Stop-PamExecution -Message "Der AST-Knotentyp '$($Ast.Kind)' wird im Resolver nicht unterstuetzt."
+            throw "Der AST-Knotentyp '$($Ast.Kind)' wird im Resolver nicht unterstuetzt."
         }
     }
 }
@@ -157,7 +154,7 @@ function Resolve-PamTemplateTokens {
             $resolvedValue = Resolve-PamTemplateExpressionAst -Ast $token.Ast -UserObject $UserObject
         }
         else {
-            Stop-PamExecution -Message "Der Token-Typ '$($token.Type)' wird im Resolver nicht unterstuetzt."
+            throw "Der Token-Typ '$($token.Type)' wird im Resolver nicht unterstuetzt."
         }
 
         $resolvedTokens.Add([pscustomobject]@{
@@ -181,11 +178,9 @@ function Resolve-PamTemplate {
         [psobject]$UserObject
     )
 
-    Write-PamLog -Level 'Debug' -Message "Template wird aufgeloest: $Template"
     $tokens = Get-PamTemplateTokens -Template $Template
     $resolvedTokens = Resolve-PamTemplateTokens -Tokens $tokens -UserObject $UserObject
 
-    Write-PamLog -Level 'Debug' -Message "Template erfolgreich aufgeloest: $Template"
     return [string]::Concat(@($resolvedTokens | ForEach-Object { $_.ResolvedValue }))
 }
 
