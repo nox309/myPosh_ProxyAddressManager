@@ -5,6 +5,9 @@
     "Surname": "Mustermann",
     "SamAccountName": "mmustermann",
     "Department": "Sales",
+    "MemberOf": [
+      "CN=MailPolicy-Standard,OU=Groups,DC=contoso,DC=com"
+    ],
     "Mail": "max.mustermann@contoso.com",
     "ProxyAddresses": [
       "SMTP:max.mustermann@contoso.com",
